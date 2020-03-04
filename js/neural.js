@@ -6,13 +6,13 @@ Math.sigmoid = function(x, derivative = false) {
 }
 
 Math.angleToPoint = function(x, y, bearing, targetX, targetY) {
-    let angleToTarget = Math.atan2(-targetY + y, targetX + x)
+    let angleToTarget = Math.atan2(-targetY + y, targetX - x)
     let diff = bearing - angleToTarget
     return (diff + Math.PI * 2) % (Math.PI * 2)
 }
 
 const LOG = true
-const LOG_COUNT = 1000
+const LOG_COUNT = 5000
 
 class Matrix {
     constructor(rows, cols, data = []) {

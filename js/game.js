@@ -1,4 +1,4 @@
-const FPS = 30; // frames per second
+const FPS = 60; // frames per second
 const FRICTION = 0.7; // friction coefficient of space (0 = no friction, 1 = lots of friction)
 const GAME_LIVES = 3; // starting number of lives
 const LASER_DIST = 0.6; // max distance laser can travel as fraction of screen width
@@ -9,7 +9,7 @@ const ROID_JAG = 0.4; // jaggedness of the asteroids (0 = none, 1 = lots)
 const ROID_PTS_LGE = 20; // points scored for a large asteroid
 const ROID_PTS_MED = 50; // points scored for a medium asteroid
 const ROID_PTS_SML = 100; // points scored for a small asteroid
-const ROID_NUM = 1; // starting number of asteroids
+const ROID_NUM = 5; // starting number of asteroids
 const ROID_SIZE = 100; // starting size of asteroids in pixels
 const ROID_SPD = 50; // max starting speed of asteroids in pixels per second
 const ROID_VERT = 10; // average number of vertices on each asteroid
@@ -46,15 +46,16 @@ var roidsLeft, roidsTotal;
 // set up the game parameters
 var level, lives, roids, score, scoreHigh, ship, text, textAlpha;
 var nn
+var aiShootTime = 0
 newGame();
 
 // Setup AI
 if (AI) {
     // TODO AI
-    nn = new NeuralNetwork(3, 20, 1)
+    nn = new NeuralNetwork(4, 20, 1)
 
     let ax, ay, sa, sx, sy;
-    for (let i = 0; i < 500000; i++) {
+    for (let i = 0; i < 1000000; i++) {
         ax = Math.random() * (canv.width + ROID_SIZE) - ROID_SIZE / 2;
         ay = Math.random() * (canv.height + ROID_SIZE) - ROID_SIZE / 2;
 
@@ -66,7 +67,7 @@ if (AI) {
 
         let direction = angle > Math.PI ? 0 : 1;
 
-        nn.train(normInput(ax, ay, sa), [direction])
+        nn.train(normInput(ax, ay, angle, sa), [direction])
     }
 }
 
@@ -276,11 +277,12 @@ function newShip() {
     }
 }
 
-function normInput(roidX, roidY, shipA) {
+function normInput(roidX, roidY, roidA, shipA) {
     let input = []
     input[0] = (roidX + ROID_SIZE / 2) / (canv.width + ROID_SIZE)
     input[1] = (roidY + ROID_SIZE / 2) / (canv.height + ROID_SIZE)
     input[2] = shipA / (Math.PI * 2)
+    input[3] = roidA / (Math.PI * 2)
     return input
 }
 
@@ -364,18 +366,39 @@ function update() {
     var exploding = ship.explodeTime > 0;
 
     if (AI) {
-        let ax = roids[0].x
-        let ay = roids[0].y
+        let c = 0
+        let dist0 = distBetweenPoints(ship.x, ship.y, roids[0].x, roids[0].y)
+        for (let i = 0; i < roids.length; i++) {
+            let dist1 = distBetweenPoints(ship.x, ship.y, roids[i].x, roids[i].y)
+            if (dist1 < dist0) {
+                dist0 = dist1
+                c = i
+            }
+        }
+
+        let ax = roids[c].x
+        let ay = roids[c].y
         let sa = ship.a;
-        let predict = nn.feedForward(normInput(ax, ay, sa)).data[0][0]
+        let sx = ship.x;
+        let sy = ship.y;
+        let angle = Math.angleToPoint(sx, sy, sa, ax, ay)
+        let predict = nn.feedForward(normInput(ax, ay, angle, sa)).data[0][0]
         let rLeft = Math.abs(predict - 0)
         let rRight = Math.abs(predict - 1)
-        if (rLeft < 0.25) {
+        if (rLeft < 0.05) {
             rotateShip(1)
-        } else if (rRight < 0.25) {
+        } else if (rRight < 0.05) {
             rotateShip(-1)
         } else {
             ship.rot = 0
+        }
+
+        if (aiShootTime == 0) {
+            shootLaser()
+            ship.canShoot = true
+            aiShootTime = Math.ceil(FPS / 5)
+        } else {
+            aiShootTime--
         }
     }
 
